@@ -1,24 +1,26 @@
 import type { Request, Response } from "express";
-import { signUpSchema } from "../zodSchemas";
-import { createNewAccount } from "../services/newAccount";
+import { signInSchema } from "../zodSchemas";
+import { findUser } from "../services/findUser";
 
-export const signUp = async (req: Request, res: Response) => {
-    const parsed = signUpSchema.safeParse(req.body);
+export const login = async (req: Request, res: Response) => {
+    const parsed = signInSchema.safeParse(req.body);
 
     if (!parsed.success) {
-        return res.status(400).json({ success: false, message: JSON.parse(parsed.error.message)[0] });
+        return res.status(400).json({ success: false, message: JSON.parse(parsed.error.message)[0].message });
     }
 
     try {
         const data = parsed.data;
-        const result = await createNewAccount(data);
+        const result = await findUser(data);
 
         if (result.success) {
             if (result.token) {
                 res.set('authorization', result.token);
-                res.status(201).json({
+                res.status(200).json({
                     success: result.success,
-                    data: result.savedData
+                    data: {
+                        token: result.token
+                    }
                 })
             }
         } else {

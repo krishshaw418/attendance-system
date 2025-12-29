@@ -6,6 +6,6 @@ interface payLoad extends JwtPayload {
 }
 
 export const generateJWT = (payLoad: payLoad) => {
-    var token = jwt.sign(payLoad, process.env.JWT_SECRET!, { algorithm: 'HS256' });
+    var token = jwt.sign(payLoad, process.env.JWT_SECRET!, { algorithm: 'HS256', expiresIn: '1H' });
     return token;
 }
