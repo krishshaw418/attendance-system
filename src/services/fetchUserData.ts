@@ -23,7 +23,7 @@ export const fetchUserData = async (id: string) => {
         } else {
             return {
                 success: false,
-                error: "Invalid userId!"
+                error: "User not found!"
             }
         }
 

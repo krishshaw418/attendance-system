@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { createClassSchema } from "../zodSchemas";
 import { createNewClass } from "../services/createNewClass";
-import { success } from "zod";
 
 interface AuthenticateRequest extends Request {
     userId?: string;
@@ -14,11 +13,11 @@ export const createClass = async (req: AuthenticateRequest, res: Response) => {
     const parsed = createClassSchema.safeParse(req.body);
 
     if (role !== "teacher") {
-        return res.status(401).json({ success: false, error: "Only teachers can create a new class." });
+        return res.status(403).json({ success: false, error: "Forbidden, teacher access required." });
     }
 
     if (!parsed.success) {
-        return res.status(400).json({ success: false, error: JSON.parse(parsed.error.message)[0].message });
+        return res.status(400).json({ success: false, error: JSON.parse(parsed.error.message) });
     }
 
     if (!userId) {

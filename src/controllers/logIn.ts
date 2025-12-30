@@ -24,7 +24,7 @@ export const logIn = async (req: Request, res: Response) => {
                 })
             }
         } else {
-            res.status(400).json({
+            res.status(404).json({
                 success: result.success,
                 error: result.error
             })

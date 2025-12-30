@@ -40,7 +40,7 @@ export const findUser = async (data: userData) => {
 
         return {
             success: false,
-            error: "Invalid email or password!"
+            error: "User not found!"
         }
 
     } catch (error: any) {

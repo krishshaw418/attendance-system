@@ -15,3 +15,7 @@ export const signInSchema = z.object({
 export const createClassSchema = z.object({
     "className": z.string()
 })
+
+export const studentIdSchema = z.object({
+    "studentId": z.string()
+})
