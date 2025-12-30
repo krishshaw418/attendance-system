@@ -1,7 +1,8 @@
 import dotenv from "dotenv";
 dotenv.config();
 import express, { type Request, type Response } from "express";
-import authRoutes from "./routes/authRoutes"
+import authRoutes from "./routes/authRoutes";
+import createRoutes from "./routes/createRoutes";
 
 let PORT = process.env.PORT!;
 
@@ -10,6 +11,7 @@ const app = express();
 app.use(express.json());
 
 app.use("/api", authRoutes);
+app.use("/api", createRoutes);
 
 app.get("/", async (req: Request, res: Response) => {
     res.status(200).json({ success: true, message: "Server is running!" });

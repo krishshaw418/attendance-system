@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { signInSchema } from "../zodSchemas";
 import { findUser } from "../services/findUser";
 
-export const login = async (req: Request, res: Response) => {
+export const logIn = async (req: Request, res: Response) => {
     const parsed = signInSchema.safeParse(req.body);
 
     if (!parsed.success) {

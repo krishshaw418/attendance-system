@@ -12,4 +12,6 @@ export const signInSchema = z.object({
     "password": z.string().min(6)
 })
 
-// export const 
+export const createClassSchema = z.object({
+    "className": z.string()
+})
