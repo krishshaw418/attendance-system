@@ -20,18 +20,18 @@ enum Role {
 }
 
 model User {
-  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
   name       String
-  email      String       @unique
+  email      String     @unique
   password   String
   role       Role
   attendance Attendance[] @relation("class-attendee")
 }
 
 model Class {
-  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
   className   String
-  teacherId   String       @db.ObjectId
+  teacherId   String     @db.ObjectId
   strudentIds String[]
   attendance  Attendance[] @relation("class-attendance")
 }
@@ -44,7 +44,7 @@ enum Status {
 model Attendance {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   class     Class  @relation("class-attendance", fields: [classId], references: [id])
-  classId   String @db.ObjectId
+  classId   String @db.ObjectId @unique
   student   User   @relation("class-attendee", fields: [studentId], references: [id])
   studentId String @db.ObjectId
   status    Status
