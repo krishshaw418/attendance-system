@@ -44,8 +44,9 @@ enum Status {
 model Attendance {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   class     Class  @relation("class-attendance", fields: [classId], references: [id])
-  classId   String @db.ObjectId @unique
+  classId   String @db.ObjectId
   student   User   @relation("class-attendee", fields: [studentId], references: [id])
   studentId String @db.ObjectId
   status    Status
+  @@unique([classId, studentId])
 }
