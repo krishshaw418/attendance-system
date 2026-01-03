@@ -8,6 +8,8 @@ import { WebSocket, WebSocketServer } from "ws";
 import { verifyJWT } from "./utils/verifyToken";
 import { TokenExpiredError, JsonWebTokenError, NotBeforeError } from "jsonwebtoken";
 import { persistAttendance } from "./services/persistAttandance";
+import { socketMessage } from "./zodSchemas";
+import { verifyStudentId } from "./services/verifyStudentId";
 
 let PORT = process.env.PORT!;
 
@@ -24,6 +26,7 @@ app.get("/", async (req: Request, res: Response) => {
 
 const server = http.createServer(app);
 
+// Created websocket layer over http server
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 interface ModifiedSocket extends WebSocket {
@@ -32,18 +35,11 @@ interface ModifiedSocket extends WebSocket {
         role?: "teacher" | "student"
     }
 }
-
-interface SocketMessage {
-    event: string;
-    data: {
-        studentId: string;
-        status: "present" | "absent"
-    }
-}
   
 wss.on('connection', (ws: ModifiedSocket) => {
     ws.on('error', console.error);
 
+    // Extracting token from the url for access verification
     const urlObj = new URL(ws.url, process.env.WS_BASE_URL);
     
     const params = Object.fromEntries(urlObj.searchParams);
@@ -52,6 +48,7 @@ wss.on('connection', (ws: ModifiedSocket) => {
 
     if (token) {
         try {
+            // Verify JWT
             const decoded = verifyJWT(token);
             ws.user = { userId: decoded.userId, role: decoded.role }
 
@@ -97,64 +94,109 @@ wss.on('connection', (ws: ModifiedSocket) => {
 
     ws.on('message', async (msg) => {
 
-        const message: SocketMessage = JSON.parse(msg.toString());
-        if (message.event === "ATTENDANCE_MARKED") {
-            const studentId = message.data.studentId;
-            const status = message.data.status;
+        const parsed = socketMessage.safeParse(JSON.parse(msg.toString()));
 
-            if (ws.user.role === "teacher") {
-                if (globalThis.activeSession) {
-                    globalThis.activeSession.attendance.set(studentId, status);
-                    console.log(globalThis.activeSession);
+        if (!parsed.success) {
+            return ws.send(JSON.stringify({
+                "event": "ERROR",
+                "data": JSON.parse(parsed.error.message)
+            }))
+        }
+
+        const message = parsed.data;
+
+        if (message.event === "ATTENDANCE_MARKED") {
+            if (message.data) {
+                const studentId = message.data.studentId;
+                try {
+                    const result = await verifyStudentId(studentId);
+                    if (!result.success) {
+                        return ws.send(JSON.stringify({
+                            event: "ERROR",
+                            data: {
+                                message: result.error
+                            }
+                        }))
+                    }
+                } catch (error) {
+                    return ws.send(JSON.stringify({
+                        event: "ERROR",
+                        data: {
+                            message: "Malformed studentId!"
+                        }
+                    }))
+                }
+                
+                const status = message.data.status;
+
+                if (ws.user.role === "teacher") {
+                    if (globalThis.activeSession) {
+                        globalThis.activeSession.attendance.set(studentId, status);
+                        console.log(globalThis.activeSession);
+                    } else {
+                    return ws.send(JSON.stringify({
+                        event: "ERROR",
+                        data: {
+                            "message": "No active attendance session"
+                        }
+                    }))
+                    }
                 } else {
                     return ws.send(JSON.stringify({
-                    event: "ERROR",
-                    data: {
-                        "message": "No active attendance session"
-                    }
-                }))
+                        event: "ERROR",
+                        data: {
+                            "message": "Forbidden, teacher event only"
+                        }
+                    }))
                 }
+
+                wss.clients.forEach((client) => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(msg.toString());
+                    }
+                })
             } else {
                 return ws.send(JSON.stringify({
                     event: "ERROR",
                     data: {
-                        "message": "Forbidden, teacher event only"
+                        "message": "Missing data field!"
                     }
                 }))
             }
-
-            wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(msg.toString());
-                }
-            })
         }
         if (message.event === "TODAY_SUMMARY") {
             if (ws.user.role === "teacher") {
                 if (globalThis.activeSession) {
                     globalThis.total = globalThis.activeSession.attendance.size;
-                globalThis.present = 0;
-                globalThis.absent = 0;
-                Array.from(globalThis.activeSession.attendance).forEach((entry) => {
-                    if (entry[1] === "present") {
-                        globalThis.present++;
-                    } else {
-                        globalThis.absent++;
-                    }
-                });
+                    globalThis.present = 0;
+                    globalThis.absent = 0;
+                    Array.from(globalThis.activeSession.attendance).forEach((entry) => {
+                        if (entry[1] === "present") {
+                            globalThis.present++;
+                        } else {
+                            globalThis.absent++;
+                        }
+                    });
 
-                wss.clients.forEach((client) => {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify({
-                            event: "TODAY_SUMMARY",
-                            data: {
-                                present: globalThis.present,
-                                absent: globalThis.absent,
-                                total: total
-                            }
-                        }));
-                    }
-                })
+                    wss.clients.forEach((client) => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                event: "TODAY_SUMMARY",
+                                data: {
+                                    present: globalThis.present,
+                                    absent: globalThis.absent,
+                                    total: total
+                                }
+                            }));
+                        }
+                    })
+                } else {
+                    return ws.send(JSON.stringify({
+                        event: "ERROR",
+                        data: {
+                            "message": "No active attendance session"
+                        }
+                    }))
                 }
             } else {
                 return ws.send(JSON.stringify({
@@ -186,7 +228,14 @@ wss.on('connection', (ws: ModifiedSocket) => {
                             }
                         }))
                     }
-                }
+                    }
+                } else {
+                    return ws.send(JSON.stringify({
+                        event: "ERROR",
+                        data: {
+                            "message": "No active attendance session"
+                        }
+                    }))
                 }
             } else {
                 return ws.send(JSON.stringify({
@@ -201,6 +250,7 @@ wss.on('connection', (ws: ModifiedSocket) => {
             if (ws.user.role === "teacher") {
                 if (globalThis.activeSession) {
                     try {
+                    // Persisting session data on db
                     const activeSession = globalThis.activeSession;
                     await Promise.all(
                         Array.from(activeSession.attendance).map((entry) => {
@@ -222,6 +272,7 @@ wss.on('connection', (ws: ModifiedSocket) => {
                         }
                     });
 
+                    // Clearing in-memory session after persisting data on the db
                     globalThis.present = 0;
                     globalThis.absent = 0;
                     globalThis.total = 0;
@@ -235,6 +286,13 @@ wss.on('connection', (ws: ModifiedSocket) => {
                         }
                     }))
                 }
+                } else {
+                    return ws.send(JSON.stringify({
+                        event: "ERROR",
+                        data: {
+                            "message": "No active attendance session"
+                        }
+                    }))
                 }
             } else {
                 return ws.send(JSON.stringify({
@@ -253,6 +311,6 @@ wss.on('connection', (ws: ModifiedSocket) => {
 })
 
 server.listen(PORT, () => {
-    console.log(`Listening at port: ${PORT}`);
+    console.log(`HTTP server listening at port: ${PORT}`);
     console.log(`Websocket endpoint: ws//localhost:${PORT}/ws`);
 })

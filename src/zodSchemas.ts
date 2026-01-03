@@ -23,3 +23,11 @@ export const studentIdSchema = z.object({
 export const classIdSchema = z.object({
     "classId": z.string()
 })
+
+export const socketMessage = z.object({
+    "event": z.enum(["ATTENDANCE_MARKED", "TODAY_SUMMARY", "MY_ATTENDANCE", "DONE"]),
+    "data": z.optional(z.object({
+        "studentId": z.string(),
+        "status": z.enum(["present", "absent"])
+    }))
+})
